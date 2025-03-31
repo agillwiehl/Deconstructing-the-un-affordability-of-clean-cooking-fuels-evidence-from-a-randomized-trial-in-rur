@@ -1,1 +1,2 @@
-#The financial and gendered reality of clean fuel consumption: a randomized trial in rural Tanzania!
+#Deconstructing the (un)affordability of clean cooking fuels through a randomized trial in rural Tanzania
+
