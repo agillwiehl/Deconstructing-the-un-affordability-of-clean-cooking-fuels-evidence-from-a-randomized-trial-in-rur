@@ -1,0 +1,552 @@
+---
+title:'Deconstructing the (un)affordability of clean cooking fuels'
+subtitle: "Cummulative Impact - MSM: Adjusted for time & not"
+
+output: pdf_document
+---
+```{r - set up}
+set.seed(123)
+library(boot)
+library(dplyr)
+n_runs=3000
+# load in data df_all
+```
+
+```{r}
+df_all_Q0_Q1 <- df_all[which(df_all$expenditure_per_capita<4666.7),]
+df_all_Q1_Q3 <- df_all[which(df_all$expenditure_per_capita>=4666.7 & df_all$expenditure_per_capita<9800),]
+df_all_Q3_Q4 <- df_all[which(df_all$expenditure_per_capita>=9800),]
+
+```
+```{r}
+cumulative_boot_function <- function(data, indices, outcome_var) {
+  # Resample clusters (household_ids)
+  household_ids <- unique(data$hh_id)
+  sampled_ids <- household_ids[indices]
+  resampled_data <- data[data$hh_id %in% sampled_ids, ]
+  
+  
+  # Fit logistic regression with the specified outcome variable
+  formula <- as.formula(paste(outcome_var, "~ cum_int_tr + visit_number"))
+  logistic_model <- glm(
+    formula = formula,
+    family = "binomial",
+    data = resampled_data
+  )
+  
+  # Create datasets for predictions at each cumulative treatment level
+  d_no_cum_int_tr <- subset(resampled_data, select = -c(cum_int_tr))
+  predictions <- list()
+  
+  for (cum_int in 0:18) {
+    temp <- data.frame(cum_int_tr = rep(cum_int, nrow(resampled_data)))
+    temp <- bind_cols(temp, d_no_cum_int_tr)
+    predictions[[cum_int + 1]] <- mean(predict(logistic_model, newdata = temp, type = "response"))
+  }
+  
+  # Combine predictions into a data frame
+  df_MSM <- data.frame(EY = unlist(predictions), cum_int_tr = 0:18)
+  
+  # Fit linear model and return slope (effect of `cum_int_tr`)
+  msm_model <- lm(EY ~ cum_int_tr, data = df_MSM)
+  return(msm_model$coefficients[2])
+}
+```
+
+```{r}
+
+cumulative_boot_function_nt <- function(data, indices, outcome_var) {
+  # Resample clusters (household_ids)
+  household_ids <- unique(data$hh_id)
+  sampled_ids <- household_ids[indices]
+  resampled_data <- data[data$hh_id %in% sampled_ids, ]
+  
+  
+  # Fit logistic regression with the specified outcome variable
+  formula <- as.formula(paste(outcome_var, "~ cum_int_tr"))
+  logistic_model <- glm(
+    formula = formula,
+    family = "binomial",
+    data = resampled_data
+  )
+  
+  # Create datasets for predictions at each cumulative treatment level
+  d_no_cum_int_tr <- subset(resampled_data, select = -c(cum_int_tr))
+  predictions <- list()
+  
+  for (cum_int in 0:18) {
+    temp <- data.frame(cum_int_tr = rep(cum_int, nrow(resampled_data)))
+    temp <- bind_cols(temp, d_no_cum_int_tr)
+    predictions[[cum_int + 1]] <- mean(predict(logistic_model, newdata = temp, type = "response"))
+  }
+  
+  # Combine predictions into a data frame
+  df_MSM <- data.frame(EY = unlist(predictions), cum_int_tr = 0:18)
+  
+  # Fit linear model and return slope (effect of `cum_int_tr`)
+  msm_model <- lm(EY ~ cum_int_tr, data = df_MSM)
+  return(msm_model$coefficients[2])
+}
+```
+
+#Exclusive use
+```{r }
+# Define the outcome variable
+outcome_variable <- "lead_exclusive_lpg_user"
+# Prepare the data
+df <- df_all %>% filter(!is.na(lead_exclusive_lpg_user))
+
+
+# Run bootstrap with stepped-wedge treatment reassignment and flexible outcome
+exclusive_lpg_bootstrap <- boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+
+# Results
+exclusive_lpg_bootstrap
+quantile(exclusive_lpg_bootstrap$t, c(0.025, 0.975))  # Confidence intervals
+(sum(abs(exclusive_lpg_bootstrap$t) > abs(exclusive_lpg_bootstrap$t0)) + 1) / (n_runs + 1)  # p-value
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap0
+quantile(exclusive_lpg_bootstrap0$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap0$t)>abs(exclusive_lpg_bootstrap0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap1
+quantile(exclusive_lpg_bootstrap1$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap1$t)>abs(exclusive_lpg_bootstrap1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap3
+quantile(exclusive_lpg_bootstrap3$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap3$t)>abs(exclusive_lpg_bootstrap3$t0))+1)/(n_runs+1)
+```
+
+# Exclusive, ITT unadjusted
+```{r warning=FALSE}
+df <- df_all %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap_unadj<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap_unadj
+quantile(exclusive_lpg_bootstrap_unadj$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap_unadj$t)>abs(exclusive_lpg_bootstrap_unadj$t0))+1)/(n_runs+1)
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap_unadj0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap_unadj0
+quantile(exclusive_lpg_bootstrap_unadj0$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap_unadj0$t)>abs(exclusive_lpg_bootstrap_unadj0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap_unadj1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap_unadj1
+quantile(exclusive_lpg_bootstrap_unadj1$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap_unadj1$t)>abs(exclusive_lpg_bootstrap_unadj1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_exclusive_lpg_user))
+exclusive_lpg_bootstrap_unadj3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+exclusive_lpg_bootstrap_unadj3
+quantile(exclusive_lpg_bootstrap_unadj3$t,c(0.025,0.975))
+(sum(abs(exclusive_lpg_bootstrap_unadj3$t)>abs(exclusive_lpg_bootstrap_unadj3$t0))+1)/(n_runs+1)
+
+```
+
+#Habitual
+```{r }
+# Define the outcome variable
+outcome_variable <- "lead_habitual_lpg_user"
+# Prepare the data
+df <- df_all %>% filter(!is.na(lead_habitual_lpg_user))
+
+
+# Run bootstrap with stepped-wedge treatment reassignment and flexible outcome
+habitual_lpg_bootstrap <- boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+
+# Results
+habitual_lpg_bootstrap
+quantile(habitual_lpg_bootstrap$t, c(0.025, 0.975))  # Confidence intervals
+(sum(abs(habitual_lpg_bootstrap$t) > abs(habitual_lpg_bootstrap$t0)) + 1) / (n_runs + 1)  # p-value
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap0
+quantile(habitual_lpg_bootstrap0$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap0$t)>abs(habitual_lpg_bootstrap0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap1
+quantile(habitual_lpg_bootstrap1$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap1$t)>abs(habitual_lpg_bootstrap1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap3
+quantile(habitual_lpg_bootstrap3$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap3$t)>abs(habitual_lpg_bootstrap3$t0))+1)/(n_runs+1)
+```
+
+# habitual, ITT unadjusted
+```{r warning=FALSE}
+outcome_variable <- "lead_habitual_lpg_user"
+df <- df_all %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap_unadj<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap_unadj
+quantile(habitual_lpg_bootstrap_unadj$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap_unadj$t)>abs(habitual_lpg_bootstrap_unadj$t0))+1)/(n_runs+1)
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap_unadj0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap_unadj0
+quantile(habitual_lpg_bootstrap_unadj0$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap_unadj0$t)>abs(habitual_lpg_bootstrap_unadj0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap_unadj1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap_unadj1
+quantile(habitual_lpg_bootstrap_unadj1$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap_unadj1$t)>abs(habitual_lpg_bootstrap_unadj1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_habitual_lpg_user))
+habitual_lpg_bootstrap_unadj3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+habitual_lpg_bootstrap_unadj3
+quantile(habitual_lpg_bootstrap_unadj3$t,c(0.025,0.975))
+(sum(abs(habitual_lpg_bootstrap_unadj3$t)>abs(habitual_lpg_bootstrap_unadj3$t0))+1)/(n_runs+1)
+
+```
+
+#Ocassional lpg user
+```{r }
+# Define the outcome variable
+outcome_variable <- "lead_ocassional_lpg_user"
+# Prepare the data
+df <- df_all %>% filter(!is.na(lead_ocassional_lpg_user))
+
+
+# Run bootstrap with stepped-wedge treatment reassignment and flexible outcome
+ocassional_lpg_bootstrap <- boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+
+# Results
+ocassional_lpg_bootstrap
+quantile(ocassional_lpg_bootstrap$t, c(0.025, 0.975))  # Confidence intervals
+(sum(abs(ocassional_lpg_bootstrap$t) > abs(ocassional_lpg_bootstrap$t0)) + 1) / (n_runs + 1)  # p-value
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap0
+quantile(ocassional_lpg_bootstrap0$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap0$t)>abs(ocassional_lpg_bootstrap0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap1
+quantile(ocassional_lpg_bootstrap1$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap1$t)>abs(ocassional_lpg_bootstrap1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap3
+quantile(ocassional_lpg_bootstrap3$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap3$t)>abs(ocassional_lpg_bootstrap3$t0))+1)/(n_runs+1)
+```
+
+# ocassional, ITT unadjusted
+```{r warning=FALSE}
+outcome_variable <- "lead_ocassional_lpg_user"
+df <- df_all %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap_unadj<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap_unadj
+quantile(ocassional_lpg_bootstrap_unadj$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap_unadj$t)>abs(ocassional_lpg_bootstrap_unadj$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap_unadj0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap_unadj0
+quantile(ocassional_lpg_bootstrap_unadj0$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap_unadj0$t)>abs(ocassional_lpg_bootstrap_unadj0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap_unadj1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap_unadj1
+quantile(ocassional_lpg_bootstrap_unadj1$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap_unadj1$t)>abs(ocassional_lpg_bootstrap_unadj1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_ocassional_lpg_user))
+ocassional_lpg_bootstrap_unadj3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+ocassional_lpg_bootstrap_unadj3
+quantile(ocassional_lpg_bootstrap_unadj3$t,c(0.025,0.975))
+(sum(abs(ocassional_lpg_bootstrap_unadj3$t)>abs(ocassional_lpg_bootstrap_unadj3$t0))+1)/(n_runs+1)
+
+```
+
+# no lpg use 
+```{r }
+# Define the outcome variable
+outcome_variable <- "lead_no_lpg_user"
+# Prepare the data
+df <- df_all %>% filter(!is.na(lead_no_lpg_user))
+
+
+# Run bootstrap with stepped-wedge treatment reassignment and flexible outcome
+no_lpg_bootstrap <- boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+
+# Results
+no_lpg_bootstrap
+quantile(no_lpg_bootstrap$t, c(0.025, 0.975))  # Confidence intervals
+(sum(abs(no_lpg_bootstrap$t) > abs(no_lpg_bootstrap$t0)) + 1) / (n_runs + 1)  # p-value
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap0
+quantile(no_lpg_bootstrap0$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap0$t)>abs(no_lpg_bootstrap0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap1
+quantile(no_lpg_bootstrap1$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap1$t)>abs(no_lpg_bootstrap1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap3
+quantile(no_lpg_bootstrap3$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap3$t)>abs(no_lpg_bootstrap3$t0))+1)/(n_runs+1)
+```
+
+# no, ITT unadjusted
+```{r warning=FALSE}
+outcome_variable <- "lead_no_lpg_user"
+df <- df_all %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap_unadj<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap_unadj
+quantile(no_lpg_bootstrap_unadj$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap_unadj$t)>abs(no_lpg_bootstrap_unadj$t0))+1)/(n_runs+1)
+
+```
+
+```{r warning=FALSE}
+df <- df_all_Q0_Q1 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap_unadj0<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap_unadj0
+quantile(no_lpg_bootstrap_unadj0$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap_unadj0$t)>abs(no_lpg_bootstrap_unadj0$t0))+1)/(n_runs+1)
+
+```
+```{r warning=FALSE}
+df <- df_all_Q1_Q3 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap_unadj1<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function_nt(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap_unadj1
+quantile(no_lpg_bootstrap_unadj1$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap_unadj1$t)>abs(no_lpg_bootstrap_unadj1$t0))+1)/(n_runs+1)
+```
+```{r warning=FALSE}
+df <- df_all_Q3_Q4 %>% filter(!is.na(lead_no_lpg_user))
+no_lpg_bootstrap_unadj3<-boot(
+  data = df,
+  statistic = function(data, indices) cumulative_boot_function(data, indices, outcome_variable),
+  R = n_runs,
+  strata = df$hh_id  # Ensure household clustering
+)
+no_lpg_bootstrap_unadj3
+quantile(no_lpg_bootstrap_unadj3$t,c(0.025,0.975))
+(sum(abs(no_lpg_bootstrap_unadj3$t)>abs(no_lpg_bootstrap_unadj3$t0))+1)/(n_runs+1)
+
+```

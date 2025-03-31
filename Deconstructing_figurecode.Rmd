@@ -1,0 +1,306 @@
+---
+title:'Deconstructing the (un)affordability of clean cooking fuels'
+subtitle: "Figures"
+
+output: pdf_document
+---
+```{r - set up}
+library(rstatix)
+library(ggplot2)
+library(RColorBrewer)
+library("ggsci")
+library(pals)
+library(viridis)
+library(dplyr)
+library(pastecs)
+library(patchwork)
+library(gridExtra)
+#load in df_all
+#load in df_baseline
+
+library(readxl)
+df_all <- read_excel("~/Desktop/Deconstructing the (un)affordability/df_all.xlsx") #make sure that amount_saved_lockbox is a numeric
+df_baseline <- read_excel("~/Desktop/Deconstructing the (un)affordability/df_baseline.xlsx")
+```
+
+
+
+
+#Figure 2 
+
+
+```{r}
+p_amount_saved_refill <- group_by(df_all, expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(amount_saved_lockbox) %>%
+  filter(weeks_in_treatment < 28) %>%
+  ggplot(aes(weeks_in_treatment, mean / 24000, color = as.factor(expend_quartile_capita))) +
+  geom_line() +
+  xlab('Weeks in treatment') +
+  ylab('Fraction of refill saved in lockbox') +
+  theme_minimal() +scale_colour_manual(values=c("#00A087FF","#B09C85FF","#4DBBD5FF"),labels = c("Low per capita expenditure", "Mid per capita expenditure","High per capita expenditure"))+
+  theme(legend.title = element_blank()) +
+  geom_pointrange(aes(ymin = mean / 24000 - sd / 24000, ymax = mean / 24000 + sd / 24000),
+                  width = .2, position = position_dodge(.9)) +
+  coord_cartesian(xlim = c(0, 26), ylim = c(0, 1)) +
+  annotate("text", x = 1.2, y = .99, label = "(a)", hjust = 0, vjust = 1, size = 5, fontface = "bold")
+p_amount_saved_refill
+```
+
+
+
+```{r - Figure 2 bottom panel}
+p_number_in_treatment <- group_by(df_all , expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(amount_saved_lockbox) %>%
+  filter(weeks_in_treatment<28)%>%
+  ggplot(aes(x=weeks_in_treatment,color=as.factor(expend_quartile_capita)))+
+  geom_bar(aes(y=n,alpha=0.1),stat="identity",fill=NA,alpha=0.1)+
+  xlab('Weeks in treatment')+scale_colour_manual(values=c("#00A087FF","#B09C85FF","#4DBBD5FF"),labels = c("Low per capita expenditure", "Mid per capita expenditure","High per capita expenditure"))+
+  theme_minimal()+
+  theme(legend.title=element_blank())+ 
+  ylab('Number of respondents')+
+  annotate("text", x = .45, y = 500, label = "(b)", hjust = 0, vjust = 1, size = 5, fontface = "bold")
+p_number_in_treatment
+```
+```{r}
+grid.arrange(p_amount_saved_refill, p_number_in_treatment)
+```
+
+
+```{r}
+df_all$total_fuel_expend_tsh <-rowSums(df_all[, c("total_firewood_per_day_tsh", "total_charcoal_per_day_tsh", "total_lpg_per_day_tsh")], na.rm = TRUE)
+df_all$CAR_month <- (df_all$total_fuel_expend_tsh*30)/(df_all$hh_expend_week_combined_final*4)
+```
+```{r - subsetting treatment and control}
+df_all_treatment<-df_all[which(df_all$intent_tr==1),]
+df_all_control<-df_all[which(df_all$intent_tr==0),]
+df_all_control <- df_all_control %>%
+  mutate(expend_quartile_capita = recode_factor(expend_quartile_capita,
+                                                "a. Low expenditure" = "d. Low expenditure",
+                                                "b. Mid expenditure" = "e. Mid expenditure",
+                                                "c. High expenditure" = "f. High expenditure"))
+
+```
+
+
+
+#Figure 3 
+```{r - category of lpg use}
+p_treatment_category <-group_by(df_all_treatment , expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(exclusive_lpg_user, habitual_lpg_user, ocassional_lpg_user,no_lpg_user) %>%
+  #ggplot(aes(fill=variable,y=median/n,x=visit_number))
+  filter(weeks_in_treatment<27) %>%
+  ggplot(aes(fill=variable, y=mean, x=weeks_in_treatment)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#3C5488FF","#00A087FF","#4DBBD5FF","#B09C85FF"),labels = c("Exclusive LPG use","Habitual LPG use","Ocassional LPG use", "No LPG use"))+
+    #ggtitle("LPG Use categories") +
+    facet_grid(~factor(expend_quartile_capita))+
+    theme(legend.title = "none")+
+    theme_minimal()+
+    xlab("Weeks in Treatment")+ ylab("% of participants")+
+    theme(legend.title=element_blank())+coord_cartesian(xlim=c(0,26),ylim=c(0, 1))
+p_treatment_category
+
+
+
+p_control_category <-group_by(df_all_control , expend_quartile_capita, weeks_in_control) %>%
+  get_summary_stats(exclusive_lpg_user, habitual_lpg_user, ocassional_lpg_user,no_lpg_user) %>%
+  #ggplot(aes(fill=variable,y=median/n,x=visit_number))
+  filter(weeks_in_control<27) %>%
+  ggplot(aes(fill=variable, y=mean, x=weeks_in_control)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#3C5488FF","#00A087FF","#4DBBD5FF","#B09C85FF"),labels = c("Exclusive LPG use","Habitual LPG use","Ocassional LPG use", "No LPG use"))+
+    #ggtitle("LPG Use categories") +
+    facet_grid(~factor(expend_quartile_capita))+
+    theme(legend.title = "none")+
+    theme_minimal()+
+    xlab("Weeks in Control")+ ylab("% of participants")+
+    theme(legend.title=element_blank())+coord_cartesian(xlim=c(0,26),ylim=c(0, 1))
+p_control_category
+
+grid.arrange(p_treatment_category, p_control_category, ncol=1)
+```
+
+#Figure S1
+```{r - control fuels}
+p_control <-group_by(df_all_control,expend_quartile_capita, weeks_in_control) %>%
+  get_summary_stats(total_mj_firewood_per_day_capita,total_mj_charcoal_per_day_capita,total_mj_lpg_per_capita_per_day) %>%
+  filter(weeks_in_control<27) %>%
+  ggplot(aes(fill=variable, y=median, x=weeks_in_control)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#B09C85FF","#3C5488FF","#00A087FF"),labels = c("Firewood","Charcoal","LPG")) +
+  geom_pointrange(aes(ymin = median - sd, ymax = median + sd),color="#FFD700",
+                  width = .2, position = position_dodge(.9),linewidth = 0.25, size=0.3) +
+    facet_grid(~factor(expend_quartile_capita)) +
+    theme(legend.title = "none")+
+    theme_minimal()+
+    xlab("Weeks in control")+ ylab("Median MJ-delivered/day/capita)")+
+    theme(legend.title=element_blank())+coord_cartesian(xlim=c(0,26),y=c(0,4))
+p_control
+```
+
+```{r - MJs}
+p_treat <- group_by(df_all_treatment , expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(total_mj_firewood_per_day_capita,total_mj_charcoal_per_day_capita,total_mj_lpg_per_capita_per_day) %>%
+  #ggplot(aes(fill=variable,y=median/n,x=visit_number)) %>%
+  filter(weeks_in_treatment<27) %>%
+  ggplot(aes(fill=variable, y=median, x=weeks_in_treatment)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#B09C85FF","#3C5488FF","#00A087FF"),labels = c("Firewood","Charcoal","LPG")) +
+  geom_pointrange(aes(ymin = mean - sd, ymax = mean + sd),color="#FFD700",
+                  width = .2, position = position_dodge(.95),linewidth = 0.25, size=0.3) +
+    facet_grid(~factor(expend_quartile_capita)) +
+    theme_minimal()+
+    xlab("Weeks in treatment")+
+    ylab("Median MJ-delivered/day/capita)")+
+    theme(legend.title=element_blank())+coord_cartesian(xlim=c(0,26),ylim=c(0,4))
+
+
+p_treat
+```
+```{r}
+grid.arrange(p_treat, p_control, ncol=1)
+```
+
+#Figure S2
+```{r - plotting cooking fuel expenditure}
+p_treatment_cooking_expenditure <-group_by(df_all_treatment, expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(total_firewood_per_day_tsh, total_charcoal_per_day_tsh, total_lpg_per_day_tsh) %>%
+  mutate(sd = ifelse(is.na(sd), 0, sd),se = ifelse(is.na(se), 0, se),sd = ifelse(is.na(sd), 0, sd),ci = ifelse(is.na(ci), 0, ci)) %>%
+  filter(weeks_in_treatment<27) %>%
+  ggplot(aes(fill=variable, y=mean/2325.96 , x=weeks_in_treatment)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#B09C85FF","#3C5488FF","#00A087FF"),labels = c("Firewood","Charcoal","LPG")) +
+  geom_pointrange(aes(ymin = mean/2325.96 - sd/2325.96, ymax = mean/2325.96 + sd/2325.96),color="#FFD700",
+                  width = .2, position = position_dodge(.95),linewidth = 0.25, size=0.3) +
+    facet_grid(~factor(expend_quartile_capita)) +
+    theme(legend.title = "none")+
+    theme_minimal()+ coord_cartesian(xlim = c(0, 26), ylim = c(0, 1)) +
+    xlab("Weeks in treatment")+ ylab("Daily expenditure on cooking fuel")+
+    theme(legend.title=element_blank())
+
+p_treatment_cooking_expenditure
+```
+
+```{r}
+p_control_cooking_expenditure <-group_by(df_all_control , expend_quartile_capita, weeks_in_control) %>%
+  get_summary_stats(total_firewood_per_day_tsh, total_charcoal_per_day_tsh, total_lpg_per_day_tsh) %>%
+  mutate(sd = ifelse(is.na(sd), 0, sd),se = ifelse(is.na(se), 0, se),sd = ifelse(is.na(sd), 0, sd),ci = ifelse(is.na(ci), 0, ci)) %>%
+  filter(weeks_in_control<27) %>%
+  subset( select = -c(ci)) %>%
+  ggplot(aes(fill=variable, y=mean/2325.96 , x=weeks_in_control)) + 
+    geom_bar(position="stack",stat="identity") +
+  scale_fill_manual(values=c("#B09C85FF","#3C5488FF","#00A087FF"),labels = c("Firewood","Charcoal","LPG")) +
+  geom_pointrange(aes(ymin = mean/2325.96 - sd/2325.96, ymax = mean/2325.96 + sd/2325.96),color="#FFD700",
+                  width = .2, position = position_dodge(.95),linewidth = 0.25, size=0.3) +
+    facet_grid(~factor(expend_quartile_capita)) +
+    theme(legend.title = "none")+
+    theme_minimal()+coord_cartesian(xlim = c(0, 26), ylim = c(0, 1)) +
+   xlab("Weeks in control")+ ylab("Daily expenditure on cooking fuel")+
+    theme(legend.title=element_blank())
+
+p_control_cooking_expenditure
+```
+```{r}
+grid.arrange(p_treatment_cooking_expenditure, p_control_cooking_expenditure, ncol=1)
+```
+
+
+#Figure S3
+```{r - CAR}
+p_treatment_car <-group_by(df_all_treatment , expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(CAR_month) %>%
+  filter(weeks_in_treatment<27) %>%
+  ggplot(aes(weeks_in_treatment,mean, color=as.factor(expend_quartile_capita)))+geom_line()+
+  geom_pointrange(aes(ymin = mean - sd, ymax = mean + sd),position = position_dodge(.4),
+                  width = .2,linewidth = 0.25, size=0.3) +
+  geom_hline(yintercept=0.05, linetype="dashed", color = "red", labels="ESMAP threshold")+       geom_text(aes(x=3,y=0.035,label=("ESMAP threshold")),color="red",size=4)+coord_cartesian(xlim = c(0, 26), ylim = c(0, 0.6)) +
+  xlab('Weeks in treatment')+ylab('Conventional affordability ratio (%)')+theme_minimal()+scale_colour_manual(values=c("#00A087FF","#B09C85FF","#4DBBD5FF"),labels = c("Low per capita expenditure", "Mid per capita expenditure","High per capita expenditure"))+theme(legend.title=element_blank())+
+  annotate("text", x =0, y = 0.6, label = "(a)", hjust = 0, vjust = 1, size = 5, fontface = "bold")
+p_treatment_car
+
+p_control_car <-group_by(df_all_control , expend_quartile_capita, weeks_in_control) %>%
+  get_summary_stats(CAR_month) %>%
+  filter(weeks_in_control<27) %>%
+  ggplot(aes(weeks_in_control,mean, color=as.factor(expend_quartile_capita)))+geom_line()+
+  geom_pointrange(aes(ymin = mean - sd, ymax = mean + sd),position = position_dodge(.4),
+                  width = .2, linewidth = 0.25, size=0.3) +
+  geom_hline(yintercept=0.05, linetype="dashed", color = "red", labels="ESMAP threshold")+       geom_text(aes(x=3,y=0.035,label=("ESMAP threshold")),color="red",size=4)+
+  geom_hline(yintercept=0.05, linetype="dashed", color = "red", labels="ESMAP threshold")+coord_cartesian(xlim = c(0, 26), ylim = c(0, 0.6)) +
+  xlab('Weeks in control')+ylab('Conventional affordability ratio (%)')+theme_minimal()+scale_colour_manual(values=c("#00A087FF","#B09C85FF","#4DBBD5FF"),labels = c("Low per capita expenditure", "Mid per capita expenditure","High per capita expenditure"))+theme(legend.title=element_blank())+
+  annotate("text", x =0, y = 0.6, label = "(b)", hjust = 0, vjust = 1, size = 5, fontface = "bold")
+p_control_car
+
+
+```
+
+```{r}
+grid.arrange(p_treatment_car, p_control_car, ncol=1)
+```
+
+#Figure S4
+```{r}
+expenditures=df_baseline$expenditure_per_capita*3.3/2325.96 
+hist(as.numeric(expenditures), col="#B09C85FF", main="Expenditure per capita", las=1, xlab='USD per capita per week PPP',breaks=20)
+abline(v=4666.7*3.3/2325.96 , lwd=3, col="red")
+abline(v=9800*3.3/2325.96 , lwd=3, col="red")
+
+text(x=2.3,y=100,labels="low")
+text(x=12,y=100,labels="mid")
+text(x=16,y=100,labels="high")
+```
+
+#Figure S5
+```{r - key graph}
+p_treatment_key <-group_by(df_all_treatment , expend_quartile_capita, weeks_in_treatment) %>%
+  get_summary_stats(key_ctw,key_mother,key_father,key_both, key_other_female,key_other_male) %>%
+  #ggplot(aes(fill=variable,y=median/n,x=visit_number))
+  ggplot(aes(fill=variable, y=mean, x=weeks_in_treatment)) + 
+    geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=c("#3C5488FF","#00A087FF","#4DBBD5FF","#B09C85FF","#F39B7FFF","#DC0000FF"),labels = c("CTW", "Female Head","Male Head","Both","Other Female","Other Male")) +
+    ggtitle("Indvidiual with key") +
+    facet_grid(~factor(expend_quartile_capita)) +
+    theme(legend.title = "none")+
+    theme_minimal()+
+    xlab("Weeks in Treatment")+ ylab("Individual with key (% of respondents)")+
+    theme(legend.title=element_blank())
+p_treatment_key
+
+```
+
+#Figure S6
+```{r - refills by key with ctw}
+library(viridis)
+#Figure S6
+
+df_refill_treatment_key=filter(df_all, visit_number==26)
+df_refill_treatment_key <-unique(df_refill_treatment_key[,c('hh_id','visit_number','total_refills',"key_ctw")])
+p_refills_key_new <-
+  ggplot(data=df_refill_treatment_key[!is.na(df_refill_treatment_key$key_ctw), ],aes(fill=as.factor(key_ctw), x=total_refills))+xlab('Total refills')+ylab('Frequency')+geom_bar(position="dodge")+theme_minimal()+
+  theme(legend.title=element_blank())+
+  scale_fill_manual(values=c("#3C5488FF","#00A087FF"),labels=c("Key with someone in household","Key with CTW")) 
+
+p_refills_key_new
+```
+
+#Figure S7
+```{r}
+
+obs_by_hh=df_all %>%
+  group_by(hh_id) %>%
+  summarise(n = n()) 
+plt_obs=ggplot(data=obs_by_hh, aes(x=hh_id,y=n))+geom_col(color='#F39B7FFF',fil='#F39B7FFF')+theme_classic()+xlab('Respondent ID')+ylab('Number of observatons (max=26)')+theme(legend.title=element_blank())
+plt_obs
+
+
+```
+#Figure S8
+```{r}
+
+obs_by_visit=df_all %>%
+  group_by(visit_number) %>%
+  summarise(n = n()) 
+plt_obs=ggplot(data=obs_by_visit, aes(x=visit_number,y=n))+geom_col(color='#B09C85FF',fill='#B09C85FF')+theme_classic()+xlab('Visit number')+ylab('Number of observatons (max=511)')+theme(legend.title=element_blank())
+plt_obs
+
+
+```

@@ -1,0 +1,62 @@
+---
+title:'Deconstructing the (un)affordability of clean cooking fuels'
+subtitle: "Table S1: Balance test"
+
+output: pdf_document
+---
+
+```{r}
+#load in df_baseline.xlsx
+library(weights)
+set.seed(252)
+
+```
+
+```{r}
+#Kabwana
+  wtd.t.test(df_baseline$kabwana,df_baseline$kabwana,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#Masonga
+  wtd.t.test(df_baseline$masonga,df_baseline$masonga,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#Michire
+  wtd.t.test(df_baseline$michire,df_baseline$michire,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#nyakina
+  wtd.t.test(df_baseline$nyakina,df_baseline$nyakina,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight) 
+#nyamagongo
+  wtd.t.test(df_baseline$nyamagongo,df_baseline$nyamagongo,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#nyatike
+  wtd.t.test(df_baseline$nyatike,df_baseline$nyatike,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#oboke
+  wtd.t.test(df_baseline$oboke,df_baseline$oboke,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+#obwere
+  wtd.t.test(df_baseline$obwere,df_baseline$obwere,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #sota
+  wtd.t.test(df_baseline$sota,df_baseline$sota,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #sidika
+  wtd.t.test(df_baseline$sidika,df_baseline$sidika,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #age
+  wtd.t.test(df_baseline$age,df_baseline$age,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #mennonite
+  wtd.t.test(df_baseline$mennonite,df_baseline$mennonite,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #catholic
+  wtd.t.test(df_baseline$catholic,df_baseline$catholic,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+   #seventh day
+  wtd.t.test(df_baseline$seventhday,df_baseline$seventhday,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+   #muslim
+  wtd.t.test(df_baseline$muslim,df_baseline$muslim,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #luo
+  wtd.t.test(df_baseline$luo,df_baseline$luo,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #hh_cooking_size
+  wtd.t.test(df_baseline$hh_cooking_size,df_baseline$hh_cooking_size,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #primary
+  wtd.t.test(df_baseline$primary,df_baseline$primary,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #secondary
+  wtd.t.test(df_baseline$secondary,df_baseline$secondary,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+ #college
+  wtd.t.test(df_baseline$college,df_baseline$college,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #hh_expend_week_combined_final
+  wtd.t.test(df_baseline$hh_expend_week_combined_final,df_baseline$hh_expend_week_combined_final,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+  #ability to save at all
+  wtd.t.test(df_baseline$saving_in_general,df_baseline$saving_in_general,weight=df_baseline$control_weight,weighty=df_baseline$treatment_weight)
+```
+
+
